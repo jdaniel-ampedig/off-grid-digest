@@ -16,6 +16,11 @@
 			path = "Off Grid Digest";
 			sourceTree = "<group>";
 		};
+		A591BD5C2E727D8B00654E1E /* Library Application */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Library Application";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +37,7 @@
 		A591BD442E725FD000654E1E = {
 			isa = PBXGroup;
 			children = (
+				A591BD5C2E727D8B00654E1E /* Library Application */,
 				A591BD4F2E725FD000654E1E /* Off Grid Digest */,
 				A591BD4E2E725FD000654E1E /* Products */,
 			);
@@ -52,6 +58,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A591BD592E725FD100654E1E /* Build configuration list for PBXNativeTarget "Off Grid Digest" */;
 			buildPhases = (
+				A591BD632E727F8A00654E1E /* ShellScript */,
 				A591BD492E725FD000654E1E /* Sources */,
 				A591BD4A2E725FD000654E1E /* Frameworks */,
 				A591BD4B2E725FD000654E1E /* Resources */,
@@ -62,6 +69,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A591BD4F2E725FD000654E1E /* Off Grid Digest */,
+				A591BD5C2E727D8B00654E1E /* Library Application */,
 			);
 			name = "Off Grid Digest";
 			packageProductDependencies = (
@@ -113,6 +121,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A591BD632E727F8A00654E1E /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\n    # Example Bash script to run during debugging\n    echo \"Running pre-debug script...\"\n    \n    echo \"copying files to proper locations...\"\n    echo \"copying from ${PROJECT_DIR}/Library Application/LaunchAgents/com.josh.forward-messages-offgrid.plist\" \n    echo \"copying to $HOME/Library/LaunchAgents\"\n    cp \"${PROJECT_DIR}/Library Application/LaunchAgents/com.josh.forward-messages-offgrid.plist\" \"$HOME/Library/LaunchAgents/com.josh.forward-messages-offgrid.plist\"\n    cp \"${PROJECT_DIR}/Library Application/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt\" \"$HOME/Library/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt\"\n    \n    # Perform actions here, e.g., create a log file, set environment variables\n    # For example, to create a file in the build products directory:\n    echo \"Debug session started at $(date)\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A591BD492E725FD000654E1E /* Sources */ = {
