@@ -136,6 +136,12 @@ To build:
 
 ---
 
+## High-level diagram
+
+<img width="1136" height="908" alt="image" src="https://github.com/user-attachments/assets/fdbf856a-d5ce-42cc-80da-ec05abc68342" />
+
+---
+
 ## 🙋 Support
 
 For issues, open a ticket on GitHub or contact the project maintainer.
