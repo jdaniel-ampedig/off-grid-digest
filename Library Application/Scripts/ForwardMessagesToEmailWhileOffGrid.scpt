@@ -311,15 +311,42 @@ on run
 
         set cmd to "/usr/bin/sqlite3 -separator ' || ' " & quoted form of dbPath & " " & quoted form of sql
 
+        -- Josh your debug statements - make them stop
         -- my logRun("SQL-> " & cmd)
 
+        
+        -- this is the cmd that runs sqlite about and places into raw
         set raw to do shell script cmd
+
+
+        --- The next few lines just cleans up the sql response so it has proper line endings
+        -- Normalize line endings just in case (optional but nice for logs)
+        set rawNorm to my replaceText(my replaceText(raw, return, linefeed), linefeed & linefeed, linefeed)
+
+        -- Split robustly (paragraphs handles LF/CR/CRLF)
+        set rows to paragraphs of rawNorm
+
+        -- Remove blanks
+        set cleanRows to {}
+        repeat with L in rows
+            set s to L as text
+            if s is not "" then set end of cleanRows to s
+        end repeat
+
+        my logRun("sqlite returned lines cleanRows=" & (count of cleanRows) as text)
+
+        set rowCount to 0
+        if raw is not "" then
+            set AppleScript's text item delimiters to linefeed
+            set rowCount to (count of text items of raw)
+        end if
+        
 
         -- If no unread messages, try "missed calls only" path
         if raw is "" then
-            my logRun("No unread 1:1 messages; checking missed calls (within window)")
+            my logRun("No unread messages; checking missed calls (within window)")
 
-            set headerLine to "New unread 1:1 messages: 0 across 0 conversations" & return & return
+            set headerLine to "New unread messages: 0 across 0 conversations" & return & return
             set bodyText to headerLine
 
             -- Missed calls section
@@ -352,7 +379,7 @@ on run
                         send theMessage
                     end tell
                 else
-                    my logRun("No unread 1:1 messages and no missed calls (within window)")
+                    my logRun("No unread messages and no missed calls (within window)")
                 end if
             else
                 my logRun("CallHistory DB not readable at: " & callDBPath)
@@ -361,17 +388,19 @@ on run
             return
         end if
 
+
         -- Parse and bundle by conversation
         set AppleScript's text item delimiters to linefeed
         set rows to text items of raw
 
-        set convNames to {}
-        set convBlobs to {}
+
+        set allBlob to ""
         set totalCount to 0
         set maxID to lastID
         set processedIDs to {}
 
-        repeat with r in rows
+        -- Note we are setting clearRows below which is the one we cleaned up line delimiters on
+        repeat with r in cleanRows
             if r is not "" then
                 set AppleScript's text item delimiters to " || "
                 set cols to text items of r
@@ -399,17 +428,7 @@ on run
                         set lineText to lineText & return & "    [Attachment: " & attachments & "]"
                     end if
 
-                    set idx to my indexOfItem(chatname, convNames)
-
-                    my logRun("chatname=" & chatname & " sender=" & sender)
-
-                    if idx = 0 then
-                        set end of convNames to chatname
-                        set end of convBlobs to lineText
-                    else
-                        set existing to item idx of convBlobs
-                        set item idx of convBlobs to existing & return & lineText
-                    end if
+                    set allBlob to allBlob & lineText & return
 
                     set totalCount to totalCount + 1
                     if rid > maxID then set maxID to rid
@@ -419,15 +438,10 @@ on run
         end repeat
 
         -- Build email
-        set headerLine to "New unread 1:1 messages: " & totalCount & " across " & (count of convNames) & " conversation" & (my pluralSuffix(count of convNames)) & return & return
-        set bodyText to headerLine
-        repeat with i from 1 to (count of convNames)
-            set cname to item i of convNames
-            set cblob to item i of convBlobs
-            set bodyText to bodyText & "-- Conversation: " & cname & return & cblob & return & return
-        end repeat
-        set subjectStr to "Off Grid Digest Messages (" & totalCount & ") in " & (count of convNames) & " Conversation" & (my pluralSuffix(count of convNames))
-        set contentStr to bodyText & return
+        set headerLine to "New unread messages: " & totalCount & return & return
+        set bodyText to headerLine & allBlob & return
+        set subjectStr to "Off-Grid Digest (" & totalCount & " message" & (my pluralSuffix(totalCount)) & ")"
+        set contentStr to bodyText
 
         -- Missed calls section (append and add subject suffix)
         -- Missed calls section
@@ -545,6 +559,22 @@ on extractFromAblob(hexstr)
         return ""
     end try
 end extractFromAblob
+
+on normalizePhoneNumber(rawSender)
+    try
+        -- Strip everything except digits
+        set digitsOnly to do shell script "echo " & quoted form of rawSender & " | tr -cd '0-9'"
+        
+        -- Keep only the last 10 digits if there are enough
+        if (length of digitsOnly) ≥ 10 then
+            set digitsOnly to text -10 thru -1 of digitsOnly
+        end if
+        
+        return digitsOnly
+    on error
+        return rawSender -- fallback if something goes wrong
+    end try
+end normalizePhoneNumber
 
 on isWithinWindow(nowEpoch, startStr, endStr)
     try
