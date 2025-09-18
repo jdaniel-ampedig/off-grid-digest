@@ -23,6 +23,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A51CD0B22E7CCD0100CE6C0A /* Diagrams */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Diagrams;
+			sourceTree = "<group>";
+		};
 		A591BD4F2E725FD000654E1E /* Off Grid Digest */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Off Grid Digest";
@@ -49,6 +54,7 @@
 		A591BD442E725FD000654E1E = {
 			isa = PBXGroup;
 			children = (
+				A51CD0B22E7CCD0100CE6C0A /* Diagrams */,
 				A591BD5C2E727D8B00654E1E /* Library Application */,
 				A591BD4F2E725FD000654E1E /* Off Grid Digest */,
 				A591BD4E2E725FD000654E1E /* Products */,
@@ -81,6 +87,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				A51CD0B22E7CCD0100CE6C0A /* Diagrams */,
 				A591BD4F2E725FD000654E1E /* Off Grid Digest */,
 				A591BD5C2E727D8B00654E1E /* Library Application */,
 			);
