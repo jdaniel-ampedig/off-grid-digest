@@ -10,8 +10,9 @@ import SwiftUI
 // MARK: - Config model
 struct FGConfig {
     var enabled: Bool = true
-    var start: Date? = Date() // now
-    var end: Date? = Calendar.current.date(byAdding: .day, value: 1, to: Date()) // same time tomorrow
+    var start: Date? = Date()
+    var end: Date? = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+    var forwardingEmail: String = ""        // NEW
 }
 
 @main
@@ -23,9 +24,9 @@ struct MsgForwardMenuApp: App {
                 .environmentObject(vm)
                 .frame(width: 320)
         } label: {
-            Text(vm.config.enabled ? "📨" : "⏸️")
+            Text(vm.config.enabled ? "🏕️" : "⏸️")
         }
-        .menuBarExtraStyle(.window) // keeps calendar pickers comfy
+        .menuBarExtraStyle(.window)
     }
 }
 
@@ -55,13 +56,20 @@ struct MenuView: View {
                 .onChange(of: vm.endBindingDate) { _ in vm.saveConfig() }
             }
 
+            // NEW: Forwarding Email
+            GroupBox("Forwarding Email") {
+                TextField("you@example.com", text: $vm.config.forwardingEmail)
+                    .onChange(of: vm.config.forwardingEmail) { _ in vm.saveConfig() }
+                    .textFieldStyle(.roundedBorder)
+                    .disableAutocorrection(true)
+                  
+            }
+
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
                 Button("Kick Now") { vm.kick() }
                 Button("Reload LaunchAgent") { vm.reload() }
-                Button("Open Log") { vm.openLog() }
-                Button("Open Config") { vm.openConfig() }
             }
 
             Divider()
@@ -96,7 +104,7 @@ final class MenuVM: ObservableObject {
         return f
     }()
 
-    // Bindings that never crash when nil (defaults to “now” but we also have Clear buttons)
+    // Bindings
     var startBindingDate: Date {
         get { config.start ?? Date() }
         set { config.start = newValue }
@@ -117,7 +125,6 @@ final class MenuVM: ObservableObject {
         } catch { }
 
         guard let s = try? String(contentsOf: cfgURL) else {
-            // Write defaults on first run
             saveConfig()
             return
         }
@@ -131,6 +138,7 @@ final class MenuVM: ObservableObject {
         config.enabled = (dict["enabled"] ?? "true").lowercased() == "true"
         if let st = dict["offgridstart"], !st.isEmpty, let d = df.date(from: st) { config.start = d } else { config.start = nil }
         if let en = dict["offgridend"], !en.isEmpty, let d = df.date(from: en) { config.end = d } else { config.end = nil }
+        config.forwardingEmail = dict["forwardingemail"] ?? ""   // NEW
 
         updateStatus()
     }
@@ -142,6 +150,7 @@ final class MenuVM: ObservableObject {
         enabled=\(config.enabled ? "true" : "false")
         offgridStart=\(startStr)
         offgridEnd=\(endStr)
+        forwardingEmail=\(config.forwardingEmail)
         """
         do {
             try FileManager.default.createDirectory(at: cfgURL.deletingLastPathComponent(),
