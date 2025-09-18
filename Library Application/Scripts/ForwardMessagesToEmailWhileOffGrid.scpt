@@ -14,7 +14,7 @@ property callDBPath : POSIX path of (path to library folder from user domain) & 
 
 property offgridStart : ""
 property offgridEnd   : ""
-property targetEmail : "segfault31@yahoo.com"
+property targetEmail : ""
 
 -- =========================
 -- Config reader
@@ -27,16 +27,25 @@ on readConfig()
 
         -- Pick the first that exists AND is non-empty
         set cfgPath to ""
-        if (do shell script "/usr/bin/test -s " & quoted form of contPath & " ; echo $?") is "0" then
-            set cfgPath to contPath
-        else if (do shell script "/usr/bin/test -s " & quoted form of userPath & " ; echo $?") is "0" then
-            set cfgPath to userPath
-        end if
+        try
+            -- Check container path first
+            set fileSize to (do shell script "stat -f%z " & quoted form of contPath)
+            if (fileSize as integer) > 0 then
+                set cfgPath to contPath
+            end if
+        on error
+            -- container file doesn't exist or is unreadable, so try user path
+            try
+                set fileSize to (do shell script "stat -f%z " & quoted form of userPath)
+                if (fileSize as integer) > 0 then
+                    set cfgPath to userPath
+                end if
+            end try
+        end try
 
--- TODO remove below and fix above to detect the correct file
-set cfgPath to contPath
+        -- Debug log if needed
+        -- my logRun("readConfig: using cfgPath -> " & cfgPath)
 
-        my logRun("readConfig: using cfgPath -> " & cfgPath)
         if cfgPath is "" then return {true, "", "", ""}
 
         -- Read file and normalize CR to LF
@@ -92,7 +101,8 @@ set cfgPath to contPath
             end if
         end if
 
-        my logRun("readConfig: enabled=" & (enabledBool as text) & " startStr=" & startStr & " endStr=" & endStr & " forwardingEmail=" & emailStr)
+        -- Debugging if needed to see config
+        -- my logRun("readConfig: enabled=" & (enabledBool as text) & " startStr=" & startStr & " endStr=" & endStr & " forwardingEmail=" & emailStr)
         return {enabledBool, startStr, endStr, emailStr}
 
     on error errMsg number errNum
@@ -109,23 +119,50 @@ end writeLastCallID
 -- Missed calls
 on fetchMissedCallsSince(lastCID)
     try
+   
+        -- set startEpochStr to ""
+        -- set endEpochStr to ""
+
+        try
+            if offgridStart is not "" then set startEpochStr to (do shell script "/bin/date -j -f '%Y-%m-%d %H:%M:%S' " & quoted form of offgridStart & " +%s")
+            if offgridEnd is not "" then set endEpochStr to (do shell script "/bin/date -j -f '%Y-%m-%d %H:%M:%S' " & quoted form of offgridEnd & " +%s")
+        on error errMsg number errNum
+            my logRun("Epoch parse error (" & errNum & "): " & errMsg)
+        end try
+
+        -- Compose WHERE snippet for CallHistory (ZDATE is seconds since 2001 -> add 978307200)
+        set callTimePred to ""
+        if startEpochStr is not "" then set callTimePred to callTimePred & " AND (ZDATE + 978307200) >= " & startEpochStr
+        if endEpochStr is not "" then set callTimePred to callTimePred & " AND (ZDATE + 978307200) <= " & endEpochStr
+
+
+        -- TODO:  I assemble all of the above but not incorporated as a filter below
+
         set sql1 to "
-WITH rec AS (
-  SELECT
-    zr.Z_PK AS cid,
-    strftime('%Y-%m-%d %H:%M:%S', zr.ZDATE + 978307200, 'unixepoch','localtime') AS ts,
-    COALESCE(zr.ZADDRESS, '') AS addr,
-    zr.ZANSWERED AS answered,
-    zr.ZORIGINATED AS originated,
-    COALESCE(zr.ZDURATION,0) AS dur
-  FROM ZCALLRECORD zr
-)
-SELECT cid, ts, addr, dur
-FROM rec
-WHERE cid > " & lastCID & " AND originated = 0 AND answered = 0
-ORDER BY cid ASC
-LIMIT 200;
-"
+        WITH rec AS (
+          SELECT
+            zr.Z_PK AS cid,
+            strftime('%Y-%m-%d %H:%M:%S', zr.ZDATE + 978307200, 'unixepoch','localtime') AS ts,
+            COALESCE(zr.ZADDRESS, '') AS addr,
+            zr.ZANSWERED AS answered,
+            zr.ZORIGINATED AS originated,
+            COALESCE(zr.ZDURATION,0) AS dur,
+            zr.ZDATE
+          FROM ZCALLRECORD zr
+        )
+        SELECT cid, ts, addr, dur
+        FROM rec
+        WHERE cid > " & lastCID & "
+          AND originated = 0
+          AND answered = 0 " & callTimePred & "
+        ORDER BY cid ASC
+        LIMIT 200;
+        "
+
+        -- Debugging
+        -- my logRun("Call log check SQL -> " & sql1)
+
+
         set cmd to "/usr/bin/sqlite3 -separator ' || ' " & quoted form of callDBPath & " " & quoted form of sql1
         set raw to do shell script cmd
         if raw is "" then return {{}, lastCID} -- none
@@ -219,45 +256,63 @@ on run
         set lastID to my readLastID()
         set dbPath to POSIX path of (path to library folder from user domain) & "Messages/chat.db"
 
+        -- Build optional epoch bounds for SQL (seconds since 1970)
+        set startEpochStr to ""
+        set endEpochStr to ""
+        try
+            if offgridStart is not "" then set startEpochStr to (do shell script "/bin/date -j -f '%Y-%m-%d %H:%M:%S' " & quoted form of offgridStart & " +%s")
+            if offgridEnd is not "" then set endEpochStr to (do shell script "/bin/date -j -f '%Y-%m-%d %H:%M:%S' " & quoted form of offgridEnd & " +%s")
+        on error errMsg number errNum
+            my logRun("Epoch parse error (" & errNum & "): " & errMsg)
+        end try
+
+        -- Compose a WHERE snippet for messages
+        set timePred to ""
+        if startEpochStr is not "" then set timePred to timePred & " AND ((m.date/1000000000) + 978307200) >= " & startEpochStr
+        if endEpochStr is not "" then set timePred to timePred & " AND ((m.date/1000000000) + 978307200) <= " & endEpochStr
+
         -- SQL: normalize newlines in m.text and include HEX(attributedBody) as fallback.
         set sql to "
-WITH msgs AS (
-  SELECT
-    m.ROWID AS rid,
-    strftime('%Y-%m-%d %H:%M:%S',
-      (m.date/1000000000) + 978307200,
-      'unixepoch','localtime'
-    ) AS ts,
-    COALESCE(c.display_name, c.chat_identifier, 'Unknown Chat') AS chatname,
-    COALESCE(h.id, 'Unknown') AS sender,
-    REPLACE(COALESCE(NULLIF(m.text,''), ''), char(10), '⏎') AS body,
-    COALESCE((
-      SELECT GROUP_CONCAT(
-               COALESCE(a.transfer_name, a.filename, 'file')
-               || CASE WHEN a.mime_type IS NOT NULL AND a.mime_type <> '' THEN ' (' || a.mime_type || ')' ELSE '' END
-               , ', '
-             )
-      FROM message_attachment_join maj
-      JOIN attachment a ON a.ROWID = maj.attachment_id
-      WHERE maj.message_id = m.ROWID
-    ), '') AS attachments,
-    HEX(m.attributedBody) AS ablob
-  FROM message m
-  LEFT JOIN handle h             ON h.ROWID = m.handle_id
-  JOIN chat_message_join cmj     ON cmj.message_id = m.ROWID
-  JOIN chat c                    ON c.ROWID = cmj.chat_id
-  WHERE m.is_from_me = 0
-    AND m.is_read = 0
-    AND m.ROWID > " & lastID & "
-    AND (SELECT COUNT(*) FROM chat_handle_join chj WHERE chj.chat_id = c.ROWID) = 1
-)
-SELECT rid, ts, chatname, sender, body, attachments, ablob
-FROM msgs
-ORDER BY rid ASC
-LIMIT 500;
-"
+        WITH msgs AS (
+          SELECT
+            m.ROWID AS rid,
+            strftime('%Y-%m-%d %H:%M:%S',
+              (m.date/1000000000) + 978307200,
+              'unixepoch','localtime'
+            ) AS ts,
+            COALESCE(c.display_name, c.chat_identifier, 'Unknown Chat') AS chatname,
+            COALESCE(h.id, 'Unknown') AS sender,
+            REPLACE(COALESCE(NULLIF(m.text,''), ''), char(10), '⏎') AS body,
+            COALESCE((
+              SELECT GROUP_CONCAT(
+                       COALESCE(a.transfer_name, a.filename, 'file')
+                       || CASE WHEN a.mime_type IS NOT NULL AND a.mime_type <> '' THEN ' (' || a.mime_type || ')' ELSE '' END
+                       , ', '
+                     )
+              FROM message_attachment_join maj
+              JOIN attachment a ON a.ROWID = maj.attachment_id
+              WHERE maj.message_id = m.ROWID
+            ), '') AS attachments,
+            HEX(m.attributedBody) AS ablob
+          FROM message m
+          LEFT JOIN handle h             ON h.ROWID = m.handle_id
+          JOIN chat_message_join cmj     ON cmj.message_id = m.ROWID
+          JOIN chat c                    ON c.ROWID = cmj.chat_id
+          WHERE m.is_from_me = 0
+            AND m.is_read = 0
+            AND m.ROWID > " & lastID & "
+            AND (SELECT COUNT(*) FROM chat_handle_join chj WHERE chj.chat_id = c.ROWID) = 1" & timePred & "
+        )
+        SELECT rid, ts, chatname, sender, body, attachments, ablob
+        FROM msgs
+        ORDER BY rid ASC
+        LIMIT 500;
+        "
 
         set cmd to "/usr/bin/sqlite3 -separator ' || ' " & quoted form of dbPath & " " & quoted form of sql
+
+        -- my logRun("SQL-> " & cmd)
+
         set raw to do shell script cmd
 
         -- If no unread messages, try "missed calls only" path
@@ -345,6 +400,9 @@ LIMIT 500;
                     end if
 
                     set idx to my indexOfItem(chatname, convNames)
+
+                    my logRun("chatname=" & chatname & " sender=" & sender)
+
                     if idx = 0 then
                         set end of convNames to chatname
                         set end of convBlobs to lineText
@@ -377,8 +435,10 @@ LIMIT 500;
         set lastCID to my readLastCallID()
 
         set callDBPath to my findCallDBPath()
-do shell script "/usr/bin/whoami" --> capture and log this
-my logRun("whoami=" & (result as text) & " callDBPath=" & callDBPath)
+        
+        -- For future debugging just in case
+        -- do shell script "/usr/bin/whoami" --> capture and log this
+        -- my logRun("whoami=" & (result as text) & " callDBPath=" & callDBPath)
 
         set callDBPath to "$HOME/Library/Application Support/CallHistoryDB/CallHistory.storedata"
 

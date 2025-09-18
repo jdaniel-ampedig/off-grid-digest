@@ -24,7 +24,14 @@ struct MsgForwardMenuApp: App {
                 .environmentObject(vm)
                 .frame(width: 320)
         } label: {
-            Text(vm.config.enabled ? "🏕️" : "⏸️")
+            
+            if (vm.config.enabled) {
+                Image("MenuBarIconTent_22x22").renderingMode(.template).frame(width:18, height: 18).help("Off-Grid Digest: Enabled")
+            } else {
+                Text("⏸️").help("Off-Grid Digest: Paused")
+            }
+            
+            //Text(vm.config.enabled ? "🏕️" : "⏸️")
         }
         .menuBarExtraStyle(.window)
     }
