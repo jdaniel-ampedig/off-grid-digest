@@ -113,7 +113,7 @@ launchctl bootout gui/$(id -u)/com.ampedig.forward-messages
 
 ---
 
-## 🖥 Optional Menu Bar App
+## 🖥 Menu Bar App
 
 A SwiftUI menu bar app (`OffGrid_DigestApp.swift`) is included to:
 - Toggle forwarding on/off  
@@ -125,7 +125,13 @@ To build:
 2. Run or build as usual
 3. Tail the log file to see all my terrible debug message `tail -f Library/Logs/ForwardMessages.log`
 
-<img width="636" height="738" alt="image" src="https://github.com/user-attachments/assets/a8fb451a-9608-445b-ae82-653aaee4f7e2" />
+<img height="500" alt="image" src="https://github.com/user-attachments/assets/a8fb451a-9608-445b-ae82-653aaee4f7e2" />
+
+
+## 🖼️ In Zoleo app Screenshots 
+
+<img height="1000" alt="image" src="https://github.com/user-attachments/assets/f188059a-a46d-4723-9b31-968444e0c914" />
+<img height="1000" alt="image" src="https://github.com/user-attachments/assets/dd16bd2c-3504-4898-bf27-30d30397516f" />
 
 
 ---
