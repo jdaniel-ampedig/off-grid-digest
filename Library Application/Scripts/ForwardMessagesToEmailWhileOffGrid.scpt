@@ -15,6 +15,7 @@ property callDBPath : POSIX path of (path to library folder from user domain) & 
 property offgridStart : ""
 property offgridEnd   : ""
 property targetEmail : ""
+property zoleoNumber : ""
 
 -- =========================
 -- Config reader
@@ -57,6 +58,7 @@ on readConfig()
         set startStr to ""
         set endStr to ""
         set emailStr to ""
+        set zoleoNumberStr to ""
 
         -- Split into lines
         set oldTID to AppleScript's text item delimiters
@@ -86,6 +88,8 @@ on readConfig()
                         set endStr to v
                     else if my iequals(k, "forwardingEmail") then
                         set emailStr to v
+                    else if my iequals(k, "zoleoNumber") then
+                        set zoleoNumberStr to v
                     end if
                 end if
             end if
@@ -103,7 +107,7 @@ on readConfig()
 
         -- Debugging if needed to see config
         -- my logRun("readConfig: enabled=" & (enabledBool as text) & " startStr=" & startStr & " endStr=" & endStr & " forwardingEmail=" & emailStr)
-        return {enabledBool, startStr, endStr, emailStr}
+        return {enabledBool, startStr, endStr, emailStr, zoleoNumberStr}
 
     on error errMsg number errNum
         my logRun("readConfig error " & (errNum as text) & ": " & errMsg)
@@ -233,10 +237,14 @@ on run
     set cfgStart to item 2 of cfg
     set cfgEnd to item 3 of cfg
     set cfgEmail to item 4 of cfg
+    set cfgNumber to item 5 of cfg
 
     if cfgStart is not "" then set offgridStart to cfgStart
     if cfgEnd is not "" then set offgridEnd to cfgEnd
     if cfgEmail is not "" then set targetEmail to cfgEmail
+    if cfgNumber is not "" then set zoleoNumber to my normalizePhoneNumber(cfgNumber)
+
+    -- my logRun("Debug: this is zoleoNumber:-> " & zoleoNumber)
 
     if isEnabled is false then
         my logRun("Disabled via config; skipping run.")
@@ -370,6 +378,10 @@ on run
                         return
                     end if
 
+                    if zoleoNumber is "" then
+                        my logRun("No zoleo number set so will not process any AI requests")
+                    end if
+
                     set subjectStr to "Off Grid Digest (Missed calls only: " & (count of missedList) & ")"
                     set contentStr to bodyText & return
 
@@ -423,7 +435,34 @@ on run
                         end if
                     end if
 
-                    set lineText to ts & " - " & sender & ": " & body
+
+                  set lineText to ts & " - " & sender & ": " & body
+
+                    ----- AI intercept ----
+
+                    set senderNum to my normalizePhoneNumber(sender)
+
+                    if zoleoNumber is not "" and senderNum is zoleoNumber then
+                        set aiPrompt to "Answer following question in 160 characters or less."
+                        set aiInput  to aiPrompt & body
+
+                        my logRun("Debug: Here is my AI prompt ->>" & aiInput )
+
+                        -- TODO: --> set aiNote to my runShortcutAI(aiInput)
+
+                        set aiNote to my runGoogleAI(aiInput)
+
+                        my logRun("Debug: Here is my AI response ->>>>" & aiNote )
+
+                        --set aiNote to "This is an AI response"
+                        if aiNote is not "" then
+                            set lineText to "[Q]: " & body & return & "[AI]: " & aiNote
+                        end if
+                    end if
+
+                    ---- END AI intercept ----
+
+                    
                     if attachments is not "" then
                         set lineText to lineText & return & "    [Attachment: " & attachments & "]"
                     end if
@@ -699,5 +738,114 @@ on ensureCallState()
         do shell script "/bin/echo 0 > " & quoted form of callStateFile
     end if
 end ensureCallState
+
+
+on runOpenAI(promptText)
+    try
+        set apiKey to do shell script "/usr/bin/security find-generic-password -w -s OGD_OPENAI_KEY"
+        set bodyJSON to "{ \"model\": \"gpt-4o-mini\", \"input\": \"" & my jsonEscape(promptText) & "\" }"
+        set cmd to "curl -s https://api.openai.com/v1/responses" & ¬
+                   " -H 'Authorization: Bearer " & apiKey & "'" & ¬
+                   " -H 'Content-Type: application/json'" & ¬
+                   " -d " & quoted form of bodyJSON
+        set res to do shell script cmd
+        -- super-lightweight parse: pull out the first \"output_text\"
+        try
+            set AppleScript's text item delimiters to "\"output_text\":\""
+            set parts to text items of res
+            if (count of parts) ≥ 2 then
+                set tail to item 2 of parts
+                set AppleScript's text item delimiters to "\""
+                set out to text 1 thru ((offset of "\"" in tail) - 1) of tail
+                return out
+            end if
+        end try
+        return res -- fallback raw
+    on error errMsg number errNum
+        my logRun("OpenAI call failed (" & errNum & "): " & errMsg)
+        return ""
+    end try
+end runOpenAI
+
+
+
+-- Safely call Google AI Studio (Gemini) and parse with jq
+on runGoogleAI(promptText)
+    try
+        -- 1) API key from Keychain (store with: security add-generic-password -a $USER -s OGD_GEMINI_KEY -w '<KEY>')
+        set apiKey to do shell script "/usr/bin/security find-generic-password -w -s OGD_GEMINI_KEY"
+        
+-- Can set key here for debugging however REMOVE BEFORE CHECK IN and Uncomment above!
+-- set apiKey to "Your Key"
+
+        if apiKey is "" then error "Gemini API key not found in Keychain (service OGD_GEMINI_KEY)."
+
+        -- 2) Find jq
+        set jqPath to my findJQ()
+        if jqPath is "" then error "jq not found. Install with: brew install jq"
+
+        -- 3) Endpoint + payload
+        set modelName to "gemini-2.5-flash"
+        set endpoint to "https://generativelanguage.googleapis.com/v1beta/models/" & modelName & ":generateContent?key=" & apiKey
+
+        set bodyJSON to "{ " & ¬
+            "\"contents\": [ { \"parts\": [ { \"text\": \"" & my jsonEscape(promptText) & "\" } ] } ]" & ¬
+        " }"
+
+        -- 4) Call + parse with jq (join multiple parts if present)
+        set curlCmd to "curl -s -X POST -H 'Content-Type: application/json' -d " & quoted form of bodyJSON & " " & quoted form of endpoint
+        set jqFilter to "'(.candidates[0].content.parts // []) | map(select(.text != null) | .text) | join(\"\\n\\n\")'"
+        set cmd to curlCmd & " | " & jqPath & " -r " & jqFilter
+
+        set aiText to do shell script cmd
+
+        -- 5) Fallbacks
+        if aiText is "" or aiText is "null" then
+            -- Try to surface a block reason / error message if present
+            set errFilter to "'if .promptFeedback.blockReason? then (\"[Blocked: \" + (.promptFeedback.blockReason|tostring) + \"]\") else (\"[No text returned]\") end'"
+            set cmd2 to curlCmd & " | " & jqPath & " -r " & errFilter
+            set altText to do shell script cmd2
+            return altText
+        end if
+
+        return aiText
+
+    on error errMsg number errNum
+        my logRun("Gemini/jq failed (" & errNum & "): " & errMsg)
+        return ""
+    end try
+end runGoogleAI
+
+-- Locate jq in common paths
+on findJQ()
+    try
+        -- First try PATH lookup via command -v
+        set jqPath to do shell script "command -v jq || true"
+        if jqPath is not "" then return jqPath
+
+        -- Otherwise, check common install locations manually
+        set paths to {"/usr/bin/jq", "/usr/local/bin/jq", "/opt/homebrew/bin/jq", "/opt/local/bin/jq"}
+        repeat with p in paths
+            try
+                if (do shell script "command -v " & quoted form of p & " || true") is p then return p
+            end try
+        end repeat
+
+        return "" -- Not found
+    on error
+        return ""
+    end try
+end findJQ
+
+-- Minimal JSON escaper for plain text prompts
+on jsonEscape(t)
+    set s to t as text
+    set s to my replaceText(s, "\\", "\\\\")
+    set s to my replaceText(s, "\"", "\\\"")
+    set s to my replaceText(s, return, "\\n")
+    set s to my replaceText(s, linefeed, "\\n")
+    set s to my replaceText(s, tab, "\\t")
+    return s
+end jsonEscape
 
 

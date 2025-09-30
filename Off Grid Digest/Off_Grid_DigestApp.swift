@@ -12,7 +12,8 @@ struct FGConfig {
     var enabled: Bool = true
     var start: Date? = Date()
     var end: Date? = Calendar.current.date(byAdding: .day, value: 1, to: Date())
-    var forwardingEmail: String = ""        // NEW
+    var forwardingEmail: String = ""
+    var zoleoNumber: String = ""
 }
 
 @main
@@ -63,10 +64,19 @@ struct MenuView: View {
                 .onChange(of: vm.endBindingDate) { _ in vm.saveConfig() }
             }
 
-            // NEW: Forwarding Email
+            // Forwarding Email
             GroupBox("Forwarding Email") {
                 TextField("you@example.com", text: $vm.config.forwardingEmail)
                     .onChange(of: vm.config.forwardingEmail) { _ in vm.saveConfig() }
+                    .textFieldStyle(.roundedBorder)
+                    .disableAutocorrection(true)
+                  
+            }
+            
+            // Zoleo Number
+            GroupBox("Zoleo Number") {
+                TextField("2095555555", text: $vm.config.zoleoNumber)
+                    .onChange(of: vm.config.zoleoNumber) { _ in vm.saveConfig() }
                     .textFieldStyle(.roundedBorder)
                     .disableAutocorrection(true)
                   
@@ -145,7 +155,8 @@ final class MenuVM: ObservableObject {
         config.enabled = (dict["enabled"] ?? "true").lowercased() == "true"
         if let st = dict["offgridstart"], !st.isEmpty, let d = df.date(from: st) { config.start = d } else { config.start = nil }
         if let en = dict["offgridend"], !en.isEmpty, let d = df.date(from: en) { config.end = d } else { config.end = nil }
-        config.forwardingEmail = dict["forwardingemail"] ?? ""   // NEW
+        config.forwardingEmail = dict["forwardingemail"] ?? ""
+        config.zoleoNumber = dict["zoleonumber"] ?? ""
 
         updateStatus()
     }
@@ -158,6 +169,7 @@ final class MenuVM: ObservableObject {
         offgridStart=\(startStr)
         offgridEnd=\(endStr)
         forwardingEmail=\(config.forwardingEmail)
+        zoleoNumber=\(config.zoleoNumber)
         """
         do {
             try FileManager.default.createDirectory(at: cfgURL.deletingLastPathComponent(),
