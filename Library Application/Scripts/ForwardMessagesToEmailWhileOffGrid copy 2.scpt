@@ -128,8 +128,8 @@ end writeLastCallID
 on fetchMissedCallsSince(lastCID)
     try
    
-         set startEpochStr to ""
-         set endEpochStr to ""
+        -- set startEpochStr to ""
+        -- set endEpochStr to ""
 
         try
             if offgridStart is not "" then set startEpochStr to (do shell script "/bin/date -j -f '%Y-%m-%d %H:%M:%S' " & quoted form of offgridStart & " +%s")
@@ -204,43 +204,6 @@ on fetchMissedCallsSince(lastCID)
 end fetchMissedCallsSince
 
 
-
-
-on findCallDBPath()
-    try
-        set base to POSIX path of (path to library folder from user domain)
-        set candidates to { ¬
-            base & "Application Support/CallHistoryDB/CallHistory.storedata", ¬
-            base & "Application Support/CallHistoryDB/CallHistoryV2.sqlite", ¬
-            base & "Application Support/CallHistoryTransactions/CallHistory.storedata", ¬
-            base & "Application Support/com.apple.CallHistoryDB/CallHistory.storedata" ¬
-        }
-
-        repeat with p in candidates
-            set pp to p as text
-
-            if my fileNonEmpty(pp) then
-                try
-                    do shell script "/usr/bin/sqlite3 -readonly " & quoted form of pp & " 'PRAGMA schema_version;' >/dev/null"
-                    my logRun("findCallDBPath: using -> " & pp)
-                    return pp
-                on error errMsg number errNum
-                    my logRun("findCallDBPath: sqlite probe failed for " & pp & " (" & errNum & "): " & errMsg)
-                end try
-            else
-                my logRun("findCallDBPath: not found or empty -> " & pp)
-            end if
-        end repeat
-
-    on error errMsg number errNum
-        my logRun("findCallDBPath error " & errNum & ": " & errMsg)
-    end try
-
-    return ""
-end findCallDBPath
-
-
-(*   This was the old function new one above 
 -- Returns the first existing & readable Call History DB path (or "")
 on findCallDBPath()
     try
@@ -269,7 +232,6 @@ on findCallDBPath()
     end try
     return ""
 end findCallDBPath
-*)
 
 -- =========================
 -- Main
@@ -912,6 +874,5 @@ on jsonEscape(t)
     set s to my replaceText(s, tab, "\\t")
     return s
 end jsonEscape
-
 
 

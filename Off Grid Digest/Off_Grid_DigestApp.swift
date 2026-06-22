@@ -14,6 +14,7 @@ struct FGConfig {
     var end: Date? = Calendar.current.date(byAdding: .day, value: 1, to: Date())
     var forwardingEmail: String = ""
     var zoleoNumber: String = ""
+    var senderEmail: String = ""
 }
 
 @main
@@ -71,6 +72,13 @@ struct MenuView: View {
                     .textFieldStyle(.roundedBorder)
                     .disableAutocorrection(true)
                   
+            }
+            
+            GroupBox("Sender Email") {
+                TextField("from@example.com", text: $vm.config.senderEmail)
+                    .onChange(of: vm.config.senderEmail) { _ in vm.saveConfig() }
+                    .textFieldStyle(.roundedBorder)
+                    .disableAutocorrection(true)
             }
             
             // Zoleo Number
@@ -157,6 +165,7 @@ final class MenuVM: ObservableObject {
         if let en = dict["offgridend"], !en.isEmpty, let d = df.date(from: en) { config.end = d } else { config.end = nil }
         config.forwardingEmail = dict["forwardingemail"] ?? ""
         config.zoleoNumber = dict["zoleonumber"] ?? ""
+        config.senderEmail = dict["senderemail"] ?? ""
 
         updateStatus()
     }
@@ -170,6 +179,7 @@ final class MenuVM: ObservableObject {
         offgridEnd=\(endStr)
         forwardingEmail=\(config.forwardingEmail)
         zoleoNumber=\(config.zoleoNumber)
+        senderEmail=\(config.senderEmail)
         """
         do {
             try FileManager.default.createDirectory(at: cfgURL.deletingLastPathComponent(),
@@ -219,7 +229,7 @@ final class MenuVM: ObservableObject {
         let enabledText = config.enabled ? "Enabled" : "Disabled"
         let s = config.start.map { df.string(from: $0) } ?? "—"
         let e = config.end.map { df.string(from: $0) } ?? "—"
-        statusLine = "\(enabledText) • Window: \(s) → \(e)" + (msg.map { " • \($0)" } ?? "")
+        statusLine = "\(enabledText) • Window: \(s) → \(e) • Sender: \(config.senderEmail.isEmpty ? "—" : config.senderEmail)" + (msg.map { " • \($0)" } ?? "")
     }
 }
 
