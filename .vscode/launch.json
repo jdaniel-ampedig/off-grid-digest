@@ -1,0 +1,72 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Off-Grid Digest: Run Once",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/offgrid-digest-go/cmd/offgrid-digest",
+      "output": "${workspaceFolder}/offgrid-digest-go/offgrid-digest-debug",
+      "cwd": "${workspaceFolder}/offgrid-digest-go",
+      "args": [
+        "--config=${workspaceFolder}/Support Files/config.ini"
+      ]
+    },
+    {
+      "name": "Off-Grid Digest: Watch",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/offgrid-digest-go/cmd/offgrid-digest",
+      "output": "${workspaceFolder}/offgrid-digest-go/offgrid-digest-debug",
+      "cwd": "${workspaceFolder}/offgrid-digest-go",
+      "args": [
+        "--config=${workspaceFolder}/Support Files/config.ini",
+        "--watch",
+        "--interval=60s"
+      ]
+    },
+    {
+      "name": "Off-Grid Digest: Dry Run",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/offgrid-digest-go/cmd/offgrid-digest",
+      "output": "${workspaceFolder}/offgrid-digest-go/offgrid-digest-debug",
+      "cwd": "${workspaceFolder}/offgrid-digest-go",
+      "args": [
+        "--config=${workspaceFolder}/Support Files/config.ini",
+        "--dry-run"
+      ]
+    },
+    {
+      "name": "Off-Grid Digest: Watch Dry Run",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/offgrid-digest-go/cmd/offgrid-digest",
+      "output": "${workspaceFolder}/offgrid-digest-go/offgrid-digest-debug",
+      "cwd": "${workspaceFolder}/offgrid-digest-go",
+      "args": [
+        "--config=${workspaceFolder}/Support Files/config.ini",
+        "--watch",
+        "--interval=60s",
+        "--dry-run"
+      ]
+    },
+    {
+      "name": "Off-Grid Digest: Print Config",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/offgrid-digest-go/cmd/offgrid-digest",
+      "output": "${workspaceFolder}/offgrid-digest-go/offgrid-digest-debug",
+      "cwd": "${workspaceFolder}/offgrid-digest-go",
+      "args": [
+        "--config=${workspaceFolder}/Support Files/config.ini",
+        "--print-config"
+      ]
+    }
+  ]
+}

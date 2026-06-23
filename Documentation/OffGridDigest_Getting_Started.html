@@ -3,96 +3,87 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Off‑Grid Digest — Getting Started</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<title>Off-Grid Digest — Getting Started</title>
 <style>
-:root{
-  --bg:#ffffff; --text:#0b1220; --muted:#5c6670; --accent:#1e3876; --border:#e7ebf0;
-}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
-.wrap{max-width:860px;margin:0 auto;padding:32px 20px}
-h1{font-size:28px;margin:0 0 8px}
-h2{font-size:20px;margin:24px 0 8px}
-p{margin:0 0 12px}
-small, .muted{color:var(--muted)}
-.card{border:1px solid var(--border);border-radius:12px;padding:16px;background:#fff;margin:16px 0}
-code, pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-pre{background:#f7f9fc;border:1px solid var(--border);padding:12px;border-radius:8px;overflow:auto}
-.hr{height:1px;background:var(--border);margin:20px 0}
-.btn{display:inline-block;background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:600}
-@media print{
-  .btn{display:none}
-  .card{break-inside:avoid}
-}
+:root { --bg:#fff; --text:#0b1220; --muted:#5c6670; --accent:#1e3876; --border:#e7ebf0; }
+* { box-sizing:border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; line-height:1.6; }
+.wrap { max-width:860px; margin:0 auto; padding:32px 20px; }
+h1 { font-size:28px; margin:0 0 8px; }
+h2 { font-size:20px; margin:24px 0 8px; }
+p { margin:0 0 12px; }
+.muted { color:var(--muted); }
+.card { border:1px solid var(--border); border-radius:12px; padding:16px; background:#fff; margin:16px 0; }
+code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+pre { background:#f7f9fc; border:1px solid var(--border); padding:12px; border-radius:8px; overflow:auto; }
+.hr { height:1px; background:var(--border); margin:20px 0; }
+@media print { .card { break-inside:avoid; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Off‑Grid Digest — Getting Started</h1>
-  <p class="muted">One‑time setup guide for forwarding iMessage/SMS and missed calls to your ZOLEO inbox.</p>
+  <h1>Off-Grid Digest — Getting Started</h1>
+  <p class="muted">One-time setup guide for forwarding unread iMessage/SMS and missed calls to your ZOLEO inbox.</p>
 
   <div class="card">
-    <h2>1) Install the app</h2>
-    <p>Drag <strong>Off Grid Digest.app</strong> to <em>Applications</em> and open it. A menu bar icon will appear.</p>
+    <h2>1) Install and open the app</h2>
+    <p>Open <strong>Off Grid Digest.app</strong>. A menu bar icon will appear.</p>
+    <p>The Swift app installs and controls the Go helper that does the forwarding work.</p>
   </div>
 
   <div class="card">
     <h2>2) Fill in the basics</h2>
     <ul>
       <li>Toggle <strong>Enabled</strong>.</li>
-      <li>Set your <strong>Off‑grid window</strong> (start/end).</li>
-      <li>Enter your <strong>forwardingEmail</strong> (your ZOLEO address).</li>
+      <li>Set your <strong>Off-grid window</strong>.</li>
+      <li>Enter your <strong>Forwarding Email</strong>, usually your ZOLEO address.</li>
+      <li>Enter your <strong>Sender Email</strong>, the account Apple Mail should send from.</li>
+      <li>Optionally enter your <strong>ZOLEO Number</strong> for AI response handling.</li>
     </ul>
   </div>
 
   <div class="card">
-    <h2>3) Grant permissions (once)</h2>
-    <p>macOS requires Full Disk Access for the tools the helper uses:</p>
-    <ol>
-      <li>System Settings → Privacy &amp; Security → <strong>Full Disk Access</strong></li>
-      <li>Add <code>/usr/bin/osascript</code> and <code>/usr/bin/sqlite3</code></li>
-    </ol>
-    <p>You may also see an Apple Events prompt the first time email is sent.</p>
+    <h2>3) Start the Go helper</h2>
+    <p>From the app menu, click <strong>Reload Go Helper</strong>.</p>
+    <p>This installs and starts the LaunchAgent:</p>
+    <pre>com.ampedig.off-grid-digest.helper</pre>
+    <p>The helper runs in watch mode and checks every 60 seconds.</p>
   </div>
 
   <div class="card">
-    <h2>4) Install &amp; start the helper</h2>
-    <p>From the app menu:</p>
-    <ul>
-      <li>Click <strong>Install Helper</strong> (or launch once to auto‑install).</li>
-      <li>Click <strong>Reload LaunchAgent</strong>.</li>
-    </ul>
+    <h2>4) Grant permissions</h2>
+    <p>macOS requires Full Disk Access for the installed Go helper:</p>
+    <pre>$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/offgrid-digest</pre>
+    <p>System Settings → Privacy &amp; Security → <strong>Full Disk Access</strong></p>
+    <p>You may also see an Apple Events / Automation prompt the first time Apple Mail sends a digest.</p>
   </div>
 
   <div class="card">
     <h2>5) Verify</h2>
-    <pre>launchctl list | grep forward-messages
-tail -f ~/Library/Logs/ForwardMessages.log</pre>
-    <p>Send yourself a test iMessage; you should receive a digest email (during the active window).</p>
+    <pre>launchctl print gui/$(id -u)/com.ampedig.off-grid-digest.helper
+tail -f "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/OffGridDigest.log"</pre>
+    <p>Send yourself a test iMessage. During the active window, the helper should detect unread 1-to-1 messages and send a digest email.</p>
   </div>
 
   <div class="card">
     <h2>Troubleshooting</h2>
     <ul>
-      <li>No emails? Re‑check Full Disk Access for the two binaries above.</li>
-      <li>Still nothing? Click <strong>Reload LaunchAgent</strong>, then see the log at <code>~/Library/Logs/ForwardMessages.log</code>.</li>
-      <li>Call history requires a readable DB at <code>~/Library/Application Support/CallHistoryDB/CallHistory.storedata</code> (varies by macOS).</li>
+      <li>No emails? Re-check Full Disk Access for the installed Go helper binary.</li>
+      <li>Still nothing? Click <strong>Reload Go Helper</strong>, then tail <code>OffGridDigest.log</code>.</li>
+      <li>Apple Mail must be configured with the sender account.</li>
+      <li>Call history is best-effort because the database path and format can vary by macOS version.</li>
     </ul>
   </div>
 
   <div class="card">
     <h2>Uninstall</h2>
-    <pre>launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.yourco.forward-messages.plist
-rm -f ~/Library/LaunchAgents/com.yourco.forward-messages.plist
-rm -f ~/Library/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt
-rm -rf ~/Library/Application\ Support/MsgForward
-rm -f  ~/Library/Logs/ForwardMessages.log</pre>
+    <pre>launchctl bootout gui/$(id -u)/com.ampedig.off-grid-digest.helper 2&gt;/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist"
+rm -rf "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward"</pre>
   </div>
 
   <div class="hr"></div>
-  <p class="muted">© {year} Amped Innovation Group — Off‑Grid Digest (preview)</p>
+  <p class="muted">© {year} Amped Innovation Group — Off-Grid Digest</p>
 </div>
 <script>
 document.body.innerHTML = document.body.innerHTML.replace("{year}", new Date().getFullYear());

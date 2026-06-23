@@ -1,147 +1,125 @@
-
 # Off-Grid Digest for macOS
 
-**Off-Grid Digest** is a lightweight macOS utility that automatically forwards your unread 1-to-1 iMessages/SMS and missed calls to your ZOLEO email address while you're off the grid.  
+Off-Grid Digest is a lightweight macOS utility that forwards unread 1-to-1 iMessages/SMS and missed calls to your ZOLEO email address while you are off grid.
 
-It runs locally on your Mac, requires no cloud services, and can be scheduled to run only during your defined off-grid window.  
+The current architecture is:
 
-**Note:** In it's initial format this will be open source with no installer.  If you're not technically inclined i.e. understand what the code is doing and how launchd works please ask someone who does to assist.  There are near future plans to create a OSX installer.
+- **Swift menu bar app**: lightweight frontend for config, enable/disable, and helper control.
+- **Go helper**: backend engine that watches Messages and CallHistory, builds digests, and sends through Apple Mail.
+- **LaunchAgent**: keeps the Go helper running in watch mode.
 
----
+## Features
 
-## ✨ Features
+- Unread-only forwarding for 1-to-1 conversations.
+- Group chat messages are filtered out.
+- Optional off-grid start/end window.
+- Missed call digest support.
+- Local config file.
+- Local logs.
+- Apple Mail sending, with SMTP planned as a future optional sender.
 
-- **Unread-Only:** Only forwards new unread 1-to-1 messages. _Group chat messages are filtered out_
-- **Windowed Operation:** Runs only during your defined start/end window.
-- **Missed Call Digest:** Includes missed calls during the same window.
-- **Local & Private:** No cloud storage or third-party servers involved.
-- **Simple Config:** Plain-text config file for start/end times, forwarding email, and enabling/disabling the service.
-- **Automatic Scheduling:** Runs periodically via `launchd`.
+## Project Structure
 
----
-
-## 📂 Project Structure
-
+```text
+Off Grid Digest.xcodeproj/       Xcode project for the Swift menu bar app
+Off Grid Digest/                 SwiftUI menu bar frontend
+offgrid-digest-go/               Go backend/helper engine
+Support Files/                   Active seed config used by Xcode and CLI examples
+Legacy AppleScript/              Reference-only AppleScript implementation
+Documentation/                   User-facing docs and release notes
+Diagrams/                        Architecture diagrams
+.vscode/launch.json              VS Code debug configs for the Go helper
 ```
-Off-Grid Digest/
-├─ ForwardMessagesToEmailWhileOffGrid.scpt   # AppleScript that does the forwarding
-├─ com.ampedig.forward-messages.plist        # LaunchAgent for scheduling
-├─ config.ini                                # User config (start/end/email/etc.)
-├─ OffGrid_DigestApp.swift                   # Optional SwiftUI menu bar app
-└─ README.md
-```
 
----
+The `Legacy AppleScript` files are reference material now. The active forwarding engine is the Go helper in `offgrid-digest-go/`.
 
-## ⚙️ Prerequisites
+## Running From Xcode
 
-- **macOS 13+** (Full Disk Access required for Messages & Call History DBs)
-- **Apple Mail** (used for sending the email digest)
-- **SQLite3** (preinstalled on macOS)
-- **ZOLEO email address** for receiving digests
+Open `Off Grid Digest.xcodeproj` and run the app.
 
----
+The Xcode build phase:
 
-## 🛠 Installation
+1. Builds the Go helper from `offgrid-digest-go`.
+2. Installs it to the app container support folder.
+3. Writes a LaunchAgent at `~/Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist`.
+4. Starts the Go helper with:
 
-1. **Clone or copy** the project folder to your Mac:
-   ```bash
-   git clone https://github.com/your-repo/off-grid-digest.git
-   ```
-
-2. **Grant Full Disk Access** for:
-   - `/usr/bin/osascript`
-   - `/usr/bin/sqlite3`
-   - Your Terminal or Xcode (for testing/debugging)
-
-3. **Place the LaunchAgent**:
-   ```bash
-   mkdir -p ~/Library/LaunchAgents
-   cp com.ampedig.forward-messages.plist ~/Library/LaunchAgents/
-   ```
-
-4. **Configure your settings** in:
-   ```bash
-   ~/Library/Application Support/MsgForward/config.ini
-   ```
-   Example:
-   ```
-   enabled=true
-   offgridStart=2025-09-10 18:44:19
-   offgridEnd=2025-09-11 18:44:19
-   forwardingEmail=your_zoleo_email@zoleo.com
-   ```
-
----
-
-## 🚀 Running
-
-### Test manually
 ```bash
-osascript ForwardMessagesToEmailWhileOffGrid.scpt
+offgrid-digest --watch --interval=60s
 ```
 
-### Load with launchd
+Tail the helper log with:
+
 ```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jdaniel.forward-messages.plist
-launchctl enable gui/$(id -u)/com.jdaniel.forward-messages
-launchctl kickstart -k gui/$(id -u)/com.ampedig.forward-messages
+tail -f "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/OffGridDigest.log"
 ```
 
-### Unload if needed
+## Running The Go Helper Directly
+
+The Go helper can run without the Swift app:
+
 ```bash
-launchctl bootout gui/$(id -u)/com.ampedig.forward-messages
+cd offgrid-digest-go
+go build -o offgrid-digest ./cmd/offgrid-digest
+./offgrid-digest --print-config
+./offgrid-digest --dry-run
+./offgrid-digest --watch --interval=60s --config "../Support Files/config.ini"
 ```
 
----
+When run this way, `OffGridDigest.log` lives next to the executable. The source config lives at `Support Files/config.ini`; pass it with `--config` unless you intentionally copy it beside the executable.
 
-## 🐞 Debugging
+See [offgrid-digest-go/README.md](offgrid-digest-go/README.md) for the command-line details.
 
-- **Log output:**  
-  ```
-  tail -f ~/Library/Logs/ForwardMessages.log
-  ```
-- **Standard output/error:**  
-  ```
-  /tmp/forward-messages.out
-  /tmp/forward-messages.err
-  ```
-- **Force run now:**  
-  ```bash
-  osascript ForwardMessagesToEmailWhileOffGrid.scpt
-  ```
+## Permissions
 
----
+macOS Full Disk Access is required for whichever process reads Messages and CallHistory.
 
-## 🖥 Menu Bar App
+During development, grant Full Disk Access to:
 
-A SwiftUI menu bar app (`OffGrid_DigestApp.swift`) is included to:
-- Toggle forwarding on/off  
-- Edit the config file  
-- Set start/end times interactively  
+- Xcode, when running the Swift app.
+- Visual Studio Code or Terminal, when debugging/running the Go helper directly.
+- The installed Go helper binary, when using the LaunchAgent:
 
-To build:
-1. Open the Xcode project
-2. Run or build as usual
-3. Tail the log file to see all my terrible debug message `tail -f Library/Logs/ForwardMessages.log`
+```text
+~/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/offgrid-digest
+```
 
-<img height="500" alt="image" src="https://github.com/user-attachments/assets/a8fb451a-9608-445b-ae82-653aaee4f7e2" />
+Apple Mail automation may also require macOS automation permission the first time the helper sends a digest.
 
+## Config
 
-## 🖼️ In Zoleo app Screenshots 
+Example `config.ini`:
 
-<img height="1000" alt="image" src="https://github.com/user-attachments/assets/f188059a-a46d-4723-9b31-968444e0c914" />
-<img height="1000" alt="image" src="https://github.com/user-attachments/assets/dd16bd2c-3504-4898-bf27-30d30397516f" />
+```ini
+enabled=true
+offgridStart=2026-06-21 18:44:19
+offgridEnd=2026-08-10 18:46:20
+forwardingEmail=your_zoleo_email@zoleo.com
+zoleoNumber=17282215812
+senderEmail=josh.daniel@ampedig.com
+```
 
+The Swift app writes config into its app support folder. The Go helper reads `config.ini` next to the executable it is running from.
 
----
+## Developer Notes
 
-## High-level diagram
+Useful Go debug commands:
 
-<img width="1136" height="908" alt="image" src="https://github.com/user-attachments/assets/fdbf856a-d5ce-42cc-80da-ec05abc68342" />
+```bash
+cd offgrid-digest-go
+./offgrid-digest --print-config
+./offgrid-digest --config "../Support Files/config.ini" --dry-run
+./offgrid-digest --config "../Support Files/config.ini" --watch --interval=10s --dry-run
+```
 
----
+Useful launchd commands:
 
-## 🙋 Support
+```bash
+launchctl print gui/$(id -u)/com.ampedig.off-grid-digest.helper
+launchctl kickstart -kp gui/$(id -u)/com.ampedig.off-grid-digest.helper
+launchctl bootout gui/$(id -u)/com.ampedig.off-grid-digest.helper
+```
+
+## Support
 
 For issues, open a ticket on GitHub or contact the project maintainer.

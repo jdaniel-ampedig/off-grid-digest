@@ -1,79 +1,88 @@
-# Off‑Grid Digest — Release Checklist
-
-> Paste this in your repo under `docs/RELEASE_CHECKLIST.md`
+# Off-Grid Digest — Release Checklist
 
 ## 0) Versioning
-- [ ] Update **CFBundleShortVersionString** (marketing) and **CFBundleVersion** (build).
-- [ ] Update `CHANGELOG.md` with highlights.
+- [ ] Update `CFBundleShortVersionString` and `CFBundleVersion`.
+- [ ] Update release notes / changelog.
 
 ## 1) App build settings
-- [ ] Signing: **Developer ID Application**.
-- [ ] Hardened Runtime: **Enabled**.
-- [ ] Disable App Sandbox (we write to `~/Library` and call system tools).
-- [ ] Info.plist: add `NSAppleEventsUsageDescription` with a clear reason.
-- [ ] Verify bundle includes:
-  - [ ] `ForwardMessagesToEmailWhileOffGrid.scpt` (Copy Bundle Resources)
-  - [ ] `com.yourco.forward-messages.plist` (template LaunchAgent) (Copy Bundle Resources)
+- [ ] Signing: Developer ID Application.
+- [ ] Hardened Runtime: enabled.
+- [ ] Confirm the app can write its Application Support files and LaunchAgent.
+- [ ] Info.plist: add `NSAppleEventsUsageDescription` explaining Apple Mail send automation.
+- [ ] Verify Xcode build phase:
+  - [ ] Builds `offgrid-digest-go/cmd/offgrid-digest`.
+  - [ ] Installs helper to:
+    `~/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/offgrid-digest`
+  - [ ] Copies seed config from `Support Files/config.ini` only if missing.
+  - [ ] Writes `~/Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist`.
+  - [ ] Bootstraps `com.ampedig.off-grid-digest.helper`.
 
-## 2) First‑run installer code
-- [ ] Copy `.scpt` → `~/Library/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt`
-- [ ] Copy/edit `.plist` → `~/Library/LaunchAgents/com.yourco.forward-messages.plist`
-  - [ ] Set `ProgramArguments`: `/usr/bin/osascript`, `~/Library/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt`
-  - [ ] Set `StartInterval`: `300` (5 min)
-- [ ] Write config file on first run if missing:
-  - [ ] `~/Library/Application Support/MsgForward/config.ini` with keys:
-    - `enabled=true`
-    - `offgridStart=` (optional `yyyy-MM-dd HH:mm:ss`)
-    - `offgridEnd=`   (optional `yyyy-MM-dd HH:mm:ss`)
-    - `forwardingEmail=`
-- [ ] Buttons in menu:
-  - [ ] **Install Helper** (optional) or perform install automatically on first run
-  - [ ] **Reload LaunchAgent** → `launchctl bootout/bootstrap`
-  - [ ] **Kick Now** → `launchctl kickstart -kp gui/$(id -u)/com.yourco.forward-messages`
-  - [ ] **Open Config** / **Open Log** convenience
+## 2) First-run helper behavior
+- [ ] Config exists at:
+  `~/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/config.ini`
+- [ ] Config supports:
+  - `enabled=true`
+  - `offgridStart=` optional `yyyy-MM-dd HH:mm:ss`
+  - `offgridEnd=` optional `yyyy-MM-dd HH:mm:ss`
+  - `forwardingEmail=`
+  - `zoleoNumber=`
+  - `senderEmail=`
+- [ ] LaunchAgent runs:
+  `offgrid-digest --watch --interval=60s`
+- [ ] Menu buttons work:
+  - [ ] Reload Go Helper
+  - [ ] Kick Now
 
-## 3) Permissions (document for users)
-- [ ] Full Disk Access (FDA): add the following in System Settings → Privacy & Security → Full Disk Access:
-  - `/usr/bin/osascript`
-  - `/usr/bin/sqlite3`
-- [ ] Apple Events prompt will appear on first send. (Reason shown from `NSAppleEventsUsageDescription`.)
+## 3) Permissions
+- [ ] Full Disk Access: add the installed Go helper binary:
+  `~/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/offgrid-digest`
+- [ ] For development, Full Disk Access is granted to Xcode, VS Code, or Terminal as needed.
+- [ ] Apple Mail automation prompt appears and can be accepted on first real send.
 
 ## 4) QA on a clean user
-- [ ] Fresh macOS user account (no prior config).
+- [ ] Fresh macOS user account or clean app container.
 - [ ] First run creates config and installs helper files.
-- [ ] UI can edit **enabled**, **start**, **end**, **forwardingEmail**.
-- [ ] LaunchAgent reload works and shows in `launchctl list`.
-- [ ] Digest email arrives during window with correct message bodies + missed calls.
-- [ ] Logs written to `~/Library/Logs/ForwardMessages.log`.
+- [ ] UI can edit enabled, start, end, forwarding email, ZOLEO number, and sender email.
+- [ ] LaunchAgent shows as running:
+  `launchctl print gui/$(id -u)/com.ampedig.off-grid-digest.helper`
+- [ ] Helper log updates:
+  `tail -f "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/OffGridDigest.log"`
+- [ ] Dry-run from Go helper reports expected config and message count.
+- [ ] Digest email arrives during the active window with message bodies and missed calls.
+- [ ] Process does not forward group chats.
+- [ ] Process marks forwarded messages read only after successful send.
 
-## 5) Archive / Notarize
-- [ ] **Product → Archive** in Xcode.
-- [ ] **Distribute App → Developer ID** (Upload) — wait for notarization to complete.
-- [ ] Alternatively (CLI): zip, `xcrun notarytool submit --wait`, `xcrun stapler staple`.
-
-## 6) Package
-- [ ] ZIP or DMG created from notarized `.app`.
-- [ ] Verify Gatekeeper open (no quarantine errors).
-
-## 7) Website / Docs
-- [ ] Update one‑pager with download link.
-- [ ] Publish **Getting Started** (HTML/PDF) and **Troubleshooting**.
-- [ ] Include **Uninstall** instructions.
-
-## 8) Support
-- [ ] Provide support email and known limitations:
-  - AppleScript relies on local Messages DB format (may change across macOS releases)
-  - Call history DB location/format can vary; feature is best‑effort
-  - Requires user‑granted FDA and Mail access
-
----
-
-### Uninstall Script (for docs)
+## 5) Go command-line QA
 ```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.yourco.forward-messages.plist 2>/dev/null || true
-rm -f ~/Library/LaunchAgents/com.yourco.forward-messages.plist
-rm -f ~/Library/Scripts/ForwardMessagesToEmailWhileOffGrid.scpt
-rm -rf ~/Library/Application\ Support/MsgForward
-rm -f  ~/Library/Logs/ForwardMessages.log
-echo 'Off‑Grid Digest helper removed.'
+cd offgrid-digest-go
+go test ./...
+go build -o offgrid-digest ./cmd/offgrid-digest
+./offgrid-digest --config "../Support Files/config.ini" --print-config
+./offgrid-digest --config "../Support Files/config.ini" --dry-run
+```
+
+## 6) Archive / Notarize
+- [ ] Product → Archive in Xcode.
+- [ ] Distribute App → Developer ID.
+- [ ] Wait for notarization.
+- [ ] Verify Gatekeeper opens the app cleanly.
+
+## 7) Docs
+- [ ] Update README.
+- [ ] Update Getting Started HTML/PDF.
+- [ ] Include uninstall instructions.
+- [ ] Include Full Disk Access instructions for the installed helper binary.
+
+## 8) Known limitations
+- Messages and CallHistory database schemas may change across macOS releases.
+- Call history DB location/format can vary.
+- Apple Mail must be configured for the sender account.
+- SMTP is not currently implemented; Apple Mail is the sender.
+
+## Uninstall Commands
+```bash
+launchctl bootout gui/$(id -u)/com.ampedig.off-grid-digest.helper 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist"
+rm -rf "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward"
+echo "Off-Grid Digest helper removed."
 ```

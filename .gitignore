@@ -1,0 +1,47 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor and local tooling
+.idea/
+.vscode/*
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+
+# Local config and secrets
+config.ini
+!/Support Files/config.ini
+*.local
+*.env
+*.env.*
+
+# Logs and runtime state
+*.log
+last_rowid.txt
+auto_last_callid.txt
+
+# Xcode / Swift build output
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+
+# Go build and test output
+/offgrid-digest-go/offgrid-digest
+/offgrid-digest-go/offgrid-digest-debug
+/offgrid-digest-go/OffGridDigest.log
+/offgrid-digest-go/XcodeSchemeOutput.log
+/offgrid-digest-go/*.test
+/offgrid-digest-go/coverage.out
+/offgrid-digest-go/coverage.html
+/offgrid-digest-go/.gocache/
+/offgrid-digest-go/bin/
+/offgrid-digest-go/dist/
+
+# Vendored dependencies are intentionally opt-in.
+/offgrid-digest-go/vendor/

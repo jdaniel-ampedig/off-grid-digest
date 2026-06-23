@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Darwin
 
 // MARK: - Config model
 struct FGConfig {
@@ -20,6 +21,23 @@ struct FGConfig {
 @main
 struct MsgForwardMenuApp: App {
     @StateObject private var vm = MenuVM()
+
+    init() {
+        print("""
+        Off-Grid Digest Go helper install path:
+        $HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/offgrid-digest
+
+        Off-Grid Digest helper log:
+        tail -f "$HOME/Library/Containers/com.ampedig.Off-Grid-Digest/Data/Library/Application Support/MsgForward/OffGridDigest.log"
+
+        LaunchAgent commands:
+        launchctl print gui/$(id -u)/com.ampedig.off-grid-digest.helper
+        launchctl bootout gui/$(id -u)/com.ampedig.off-grid-digest.helper
+        launchctl bootstrap gui/$(id -u) "$HOME/Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist"
+        launchctl kickstart -kp gui/$(id -u)/com.ampedig.off-grid-digest.helper
+        """)
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuView()
@@ -94,7 +112,7 @@ struct MenuView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Button("Kick Now") { vm.kick() }
-                Button("Reload LaunchAgent") { vm.reload() }
+                Button("Reload Go Helper") { vm.reload() }
             }
 
             Divider()
@@ -113,12 +131,17 @@ final class MenuVM: ObservableObject {
     @Published var statusLine: String = ""
 
     // File locations
-    private let cfgURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/MsgForward/config.ini")
-    private let logURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/ForwardMessages.log")
-    private let plistURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/LaunchAgents/com.jdaniel.forward-messages.plist")
+    private let helperLabel = "com.ampedig.off-grid-digest.helper"
+    private let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("MsgForward", isDirectory: true)
+    private var cfgURL: URL { appSupportURL.appendingPathComponent("config.ini") }
+    private var helperURL: URL { appSupportURL.appendingPathComponent("offgrid-digest") }
+    private var logURL: URL { appSupportURL.appendingPathComponent("OffGridDigest.log") }
+    private var launchdLogURL: URL { appSupportURL.appendingPathComponent("OffGridDigest.launchd.log") }
+    private var plistURL: URL {
+        realHomeURL()
+            .appendingPathComponent("Library/LaunchAgents/com.ampedig.off-grid-digest.helper.plist")
+    }
 
     // Date format used in config.ini
     private let df: DateFormatter = {
@@ -192,8 +215,15 @@ final class MenuVM: ObservableObject {
     }
 
     // MARK: launchctl helpers
-    func kick()    { runLaunchctl(["kickstart","-kp","gui/\(uid())/com.jdaniel.forward-messages"]) }
+    func kick()    { runLaunchctl(["kickstart","-kp","gui/\(uid())/\(helperLabel)"]) }
     func reload()  {
+        do {
+            try writeLaunchAgent()
+        } catch {
+            updateStatus("Failed to write LaunchAgent: \(error.localizedDescription)")
+            return
+        }
+        runLaunchctl(["bootout","gui/\(uid())/com.jdaniel.forward-messages"])
         runLaunchctl(["bootout","gui/\(uid())", plistURL.path])
         runLaunchctl(["bootstrap","gui/\(uid())", plistURL.path])
     }
@@ -202,7 +232,48 @@ final class MenuVM: ObservableObject {
     func openLog()    { NSWorkspace.shared.open(logURL) }
     func openConfig() { NSWorkspace.shared.open(cfgURL) }
 
+    private func writeLaunchAgent() throws {
+        try FileManager.default.createDirectory(at: plistURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: appSupportURL,
+                                                withIntermediateDirectories: true)
+
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>Label</key>
+            <string>\(helperLabel)</string>
+            <key>ProgramArguments</key>
+            <array>
+                <string>\(helperURL.path)</string>
+                <string>--watch</string>
+                <string>--interval=60s</string>
+            </array>
+            <key>RunAtLoad</key>
+            <true/>
+            <key>KeepAlive</key>
+            <false/>
+            <key>StandardOutPath</key>
+            <string>\(launchdLogURL.path)</string>
+            <key>StandardErrorPath</key>
+            <string>\(launchdLogURL.path)</string>
+        </dict>
+        </plist>
+        """
+
+        try plist.write(to: plistURL, atomically: true, encoding: .utf8)
+    }
+
     private func uid() -> String { String(getuid()) }
+
+    private func realHomeURL() -> URL {
+        guard let pw = getpwuid(getuid()), let home = pw.pointee.pw_dir else {
+            return FileManager.default.homeDirectoryForCurrentUser
+        }
+        return URL(fileURLWithPath: String(cString: home), isDirectory: true)
+    }
 
     @discardableResult
     private func runLaunchctl(_ args: [String]) -> Int32 {
@@ -232,4 +303,3 @@ final class MenuVM: ObservableObject {
         statusLine = "\(enabledText) • Window: \(s) → \(e) • Sender: \(config.senderEmail.isEmpty ? "—" : config.senderEmail)" + (msg.map { " • \($0)" } ?? "")
     }
 }
-

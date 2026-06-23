@@ -13,10 +13,10 @@ Off‑Grid Digest forwards new iMessage/SMS and missed calls to your ZOLEO inbox
 
 **Callouts (small print):**
 - To work, macOS needs some one‑time permissions:
-  1) *Full Disk Access* for **/usr/bin/osascript** and **/usr/bin/sqlite3**
-  2) *Automation (Apple Events)* prompt may appear when sending the email
+  1) *Full Disk Access* for the installed **offgrid-digest** helper
+  2) *Automation (Apple Events)* prompt may appear when Apple Mail sends the email
 
-**Primary CTA Button:** Install Helper & Continue
+**Primary CTA Button:** Install Go Helper & Continue
 **Secondary Link:** I’ll set it up later
 
 **Footer (tiny):**
